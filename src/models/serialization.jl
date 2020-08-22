@@ -1,98 +1,96 @@
+# Keep in sync with _ENCODE_AS_UUID_A.
+const _ENCODE_AS_UUID_A = (
+    Union{Nothing, Arc},
+    Union{Nothing, Area},
+    Union{Nothing, Bus},
+    Union{Nothing, LoadZone},
+    Union{Nothing, DynamicInjection},
+    Vector{Service},
+)
 
-# Enables deserialization of VariableCost. The default implementation can't figure out the
-# variable Union.
+# Keep in sync with _ENCODE_AS_UUID_B.
+const _ENCODE_AS_UUID_B = (Arc, Area, Bus, LoadZone, DynamicInjection, Vector{Service})
 
-function JSON2.read(io::IO, ::Type{VariableCost})
-    data = JSON2.read(io)
-    if data.cost isa Real
-        return VariableCost(Float64(data.cost))
-    elseif data.cost[1] isa Array
-        variable = Vector{Tuple{Float64, Float64}}()
-        for array in data.cost
-            push!(variable, Tuple{Float64, Float64}(array))
-        end
-    else
-        @assert data.cost isa Tuple || data.cost isa Array
-        variable = Tuple{Float64, Float64}(data.cost)
-    end
+encode_as_uuid_type(::Type{T}) where {T} = mapreduce(x -> T <: x, |, _ENCODE_AS_UUID_A)
+encode_as_uuid_val(val) = mapreduce(x -> val isa x, |, _ENCODE_AS_UUID_B)
 
-    return VariableCost(variable)
-end
-
-const COMPOSED_COMPONENTS = (Area, Bus, LoadZone, Vector{Service})
-
-function JSON2.write(io::IO, component::T) where {T <: Component}
-    return JSON2.write(io, encode_components_with_uuids(component, COMPOSED_COMPONENTS))
-end
-
-function JSON2.write(component::T) where {T <: Component}
-    return JSON2.write(encode_components_with_uuids(component, COMPOSED_COMPONENTS))
-end
-
-function encode_components_with_uuids(component::T, types_as_uuids) where {T}
-    fields = fieldnames(T)
-    vals = []
-
-    for name in fields
+function IS.serialize(component::T) where {T <: Component}
+    data = Dict{String, Any}()
+    for name in fieldnames(T)
         val = getfield(component, name)
-        if mapreduce(x -> val isa x, |, types_as_uuids)
+        if encode_as_uuid_val(val)
             if val isa Array
-                push!(vals, [IS.get_uuid(x) for x in val])
+                val = [IS.get_uuid(x) for x in val]
+            elseif isnothing(val)
+                val = nothing
             else
-                push!(vals, IS.get_uuid(val))
+                val = IS.get_uuid(val)
             end
-        else
-            push!(vals, val)
         end
+        data[string(name)] = serialize(val)
     end
 
-    return NamedTuple{fields}(vals)
+    return data
 end
 
-# Default JSON conversion for Component to handle composed components stored as UUIDs.
-# Keep in sync with COMPOSED_COMPONENTS.
-
-function IS.convert_type(
-    ::Type{T},
-    data::NamedTuple,
-    component_cache::Dict,
-) where {T <: Component}
+function IS.deserialize(::Type{T}, data::Dict, component_cache::Dict) where {T <: Component}
     @debug T data
-    values = []
-    for (fieldname, fieldtype) in zip(fieldnames(T), fieldtypes(T))
-        val = getfield(data, fieldname)
-        if !isnothing(val) && (
-            fieldtype <: Union{Nothing, Area} ||
-            fieldtype <: Union{Nothing, LoadZone} ||
-            fieldtype <: Vector{Service} ||
-            fieldtype <: Bus
-        )
-            if fieldtype <: Vector{Service}
-                _values = fieldtype()
+    vals = Dict{Symbol, Any}()
+    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
+        val = data[string(field_name)]
+        if isnothing(val)
+            vals[field_name] = val
+        elseif encode_as_uuid_type(field_type)
+            if field_type <: Vector{Service}
+                _vals = field_type()
                 for _val in val
-                    uuid = Base.UUID(_val.value)
+                    uuid = deserialize(Base.UUID, _val)
                     component = component_cache[uuid]
-                    push!(_values, component)
+                    push!(_vals, component)
                 end
-                push!(values, _values)
+                vals[field_name] = _vals
             else
-                uuid = Base.UUID(val.value)
+                uuid = deserialize(Base.UUID, val)
                 component = component_cache[uuid]
-                push!(values, component)
+                vals[field_name] = component
             end
-        elseif fieldtype <: Component
-            # Recurse.
-            push!(values, IS.convert_type(fieldtype, val, component_cache))
+        elseif field_type <: Component
+            vals[field_name] = IS.deserialize(field_type, val, component_cache)
+        elseif field_type <: Union{Nothing, Component}
+            vals[field_name] = IS.deserialize(field_type.b, val, component_cache)
+        elseif field_type <: InfrastructureSystemsType
+            vals[field_name] = deserialize(field_type, val)
+        elseif field_type <: Union{Nothing, InfrastructureSystemsType}
+            vals[field_name] = deserialize(field_type.b, val)
+        elseif field_type <: Enum
+            vals[field_name] = get_enum_value(field_type, val)
+        elseif field_type <: Union{Nothing, Enum}
+            vals[field_name] = get_enum_value(field_type.b, val)
         else
-            obj = IS.convert_type(fieldtype, val)
-            push!(values, obj)
+            vals[field_name] = deserialize(field_type, val)
         end
     end
 
-    return T(values...)
+    if !isempty(T.parameters)
+        return deserialize_parametric_type(T, PowerSystems, vals)
+    end
+
+    return T(; vals...)
 end
 
-function get_component_type(component_type::Symbol)
+function IS.deserialize(::Type{Device}, data::Any)
+    error("This form of IS.deserialize is not supported for Devices")
+end
+
+function IS.deserialize_parametric_type(
+    ::Type{T},
+    mod::Module,
+    data::Dict,
+) where {T <: Service}
+    return T(; data...)
+end
+
+function get_component_type(component_type::String)
     # This function will ensure that `component_type` contains a valid type expression,
     # so it should be safe to eval.
     return eval(IS.parse_serialized_type(component_type))

@@ -20,20 +20,6 @@
             "max": null
           },
           "validation_action": "warn"
-        },
-        {
-          "name": "forecasts",
-          "accessor_module": "InfrastructureSystems",
-          "comment": "internal forecast storage",
-          "null_value": "InfrastructureSystems.Forecasts()",
-          "data_type": "InfrastructureSystems.Forecasts",
-          "default": "InfrastructureSystems.Forecasts()"
-        },
-        {
-          "name": "internal",
-          "comment": "power system internal reference, do not modify",
-          "data_type": "InfrastructureSystemsInternal",
-          "internal_default": "InfrastructureSystemsInternal()"
         }
       ],
       "supertype": "OperationalCost"
@@ -75,20 +61,6 @@
             "max": null
           },
           "validation_action": "warn"
-        },
-        {
-          "name": "forecasts",
-          "accessor_module": "InfrastructureSystems",
-          "comment": "internal forecast storage",
-          "null_value": "InfrastructureSystems.Forecasts()",
-          "data_type": "InfrastructureSystems.Forecasts",
-          "default": "InfrastructureSystems.Forecasts()"
-        },
-        {
-          "name": "internal",
-          "comment": "power system internal reference, do not modify",
-          "data_type": "InfrastructureSystemsInternal",
-          "internal_default": "InfrastructureSystemsInternal()"
         }
       ],
       "supertype": "OperationalCost"
@@ -131,20 +103,6 @@
             "max": null
           },
           "validation_action": "warn"
-        },
-        {
-          "name": "forecasts",
-          "accessor_module": "InfrastructureSystems",
-          "comment": "internal forecast storage",
-          "null_value": "InfrastructureSystems.Forecasts()",
-          "data_type": "InfrastructureSystems.Forecasts",
-          "default": "InfrastructureSystems.Forecasts()"
-        },
-        {
-          "name": "internal",
-          "comment": "power system internal reference, do not modify",
-          "data_type": "InfrastructureSystemsInternal",
-          "internal_default": "InfrastructureSystemsInternal()"
         }
       ],
       "supertype": "OperationalCost"
@@ -343,6 +301,7 @@
           "internal_default": "InfrastructureSystemsInternal()"
         }
       ],
+      "custom_code": "IS.get_name(arc::Arc) = (get_name ∘ get_from)(arc) * \" -> \" * (get_name ∘ get_to)(arc)",
       "supertype": "Topology"
     },
     {
@@ -1175,14 +1134,6 @@
           "data_type": "Dict{String, Any}",
           "null_value": "Dict{String, Any}()",
           "default": "Dict{String, Any}()"
-        },
-        {
-          "name": "forecasts",
-          "accessor_module": "InfrastructureSystems",
-          "comment": "internal forecast storage",
-          "null_value": "InfrastructureSystems.Forecasts()",
-          "data_type": "InfrastructureSystems.Forecasts",
-          "default": "InfrastructureSystems.Forecasts()"
         },
         {
           "name": "internal",

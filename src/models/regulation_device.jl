@@ -66,6 +66,98 @@ function RegulationDevice(
     )
 end
 
+function RegulationDevice(;
+    device::T,
+    droop::Float64 = Inf,
+    participation_factor::NamedTuple{(:up, :dn), Tuple{Float64, Float64}} = (
+        up = 0.0,
+        dn = 0.0,
+    ),
+    reserve_limit_up::Float64 = 0.0,
+    reserve_limit_dn::Float64 = 0.0,
+    inertia::Float64 = 0.0,
+    cost::Float64 = 1.0,
+    forecasts = IS.Forecasts(),
+    internal = IS.InfrastructureSystemsInternal(),
+) where {T <: StaticInjection}
+    return RegulationDevice{T}(
+        device,
+        droop,
+        participation_factor,
+        reserve_limit_up,
+        reserve_limit_dn,
+        inertia,
+        cost,
+        forecasts,
+        internal,
+    )
+end
+
+function IS.serialize(component::T) where {T <: RegulationDevice}
+    data = Dict{String, Any}()
+    for name in fieldnames(T)
+        val = getfield(component, name)
+        if val isa StaticInjection
+            # The device is not attached to the system, so serialize it and save the type.
+            data["__static_injector_type"] = string(typeof(val))
+        elseif encode_as_uuid_val(val)
+            if val isa Array
+                val = [IS.get_uuid(x) for x in val]
+            elseif isnothing(val)
+                val = nothing
+            else
+                val = IS.get_uuid(val)
+            end
+        end
+        data[string(name)] = serialize(val)
+    end
+
+    return data
+end
+
+function IS.deserialize(
+    ::Type{T},
+    data::Dict,
+    component_cache::Dict,
+) where {T <: RegulationDevice}
+    @debug T data
+    vals = Dict{Symbol, Any}()
+    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
+        val = data[string(field_name)]
+        if isnothing(val)
+            vals[field_name] = val
+        elseif field_type <: StaticInjection
+            type = get_component_type(data["__static_injector_type"])
+            vals[field_name] = deserialize(type, val, component_cache)
+        elseif encode_as_uuid_type(field_type)
+            if field_type <: Vector{Service}
+                _vals = field_type()
+                for _val in val
+                    uuid = deserialize(Base.UUID, _val)
+                    component = component_cache[uuid]
+                    push!(_vals, component)
+                end
+                vals[field_name] = _vals
+            else
+                uuid = deserialize(Base.UUID, val)
+                component = component_cache[uuid]
+                vals[field_name] = component
+            end
+        elseif field_type <: Component
+            # Recurse.
+            vals[field_name] = IS.deserialize(field_type, val, component_cache)
+        elseif field_type <: Enum
+            vals[field_name] = get_enum_value(field_type, val)
+        elseif field_type <: Union{Nothing, Enum}
+            vals[field_name] = get_enum_value(field_type.b, val)
+        else
+            vals[field_name] = IS.deserialize(field_type, val)
+        end
+    end
+
+    return RegulationDevice(; vals...)
+end
+
 IS.get_forecasts(value::RegulationDevice) = value.forecasts
 IS.get_name(value::RegulationDevice) = IS.get_name(value.device)
 get_internal(value::RegulationDevice) = value.internal
