@@ -1300,6 +1300,10 @@ function check_attached_buses(sys::System, component::Branch)
     throw_if_not_attached(get_to_bus(component), sys)
 end
 
+function check_attached_buses(sys::System, component::DynamicBranch)
+    check_attached_buses(sys, get_branch(component))
+end
+
 function check_attached_buses(sys::System, component::Arc)
     throw_if_not_attached(get_from(component), sys)
     throw_if_not_attached(get_to(component), sys)

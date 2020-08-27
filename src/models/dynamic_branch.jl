@@ -71,7 +71,7 @@ function IS.deserialize(
             type = get_component_type(data["__branch_type"])
             vals[field_name] = deserialize(type, val, component_cache)
         else
-            vals[field_name] = IS.deserialize(field_type, val)
+            vals[field_name] = deserialize_type(field_name, field_type, val, component_cache)
         end
     end
 

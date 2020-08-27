@@ -36,39 +36,8 @@ end
 function IS.deserialize(::Type{T}, data::Dict, component_cache::Dict) where {T <: Component}
     @debug T data
     vals = Dict{Symbol, Any}()
-    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
-        val = data[string(field_name)]
-        if isnothing(val)
-            vals[field_name] = val
-        elseif encode_as_uuid_type(field_type)
-            if field_type <: Vector{Service}
-                _vals = field_type()
-                for _val in val
-                    uuid = deserialize(Base.UUID, _val)
-                    component = component_cache[uuid]
-                    push!(_vals, component)
-                end
-                vals[field_name] = _vals
-            else
-                uuid = deserialize(Base.UUID, val)
-                component = component_cache[uuid]
-                vals[field_name] = component
-            end
-        elseif field_type <: Component
-            vals[field_name] = IS.deserialize(field_type, val, component_cache)
-        elseif field_type <: Union{Nothing, Component}
-            vals[field_name] = IS.deserialize(field_type.b, val, component_cache)
-        elseif field_type <: InfrastructureSystemsType
-            vals[field_name] = deserialize(field_type, val)
-        elseif field_type <: Union{Nothing, InfrastructureSystemsType}
-            vals[field_name] = deserialize(field_type.b, val)
-        elseif field_type <: Enum
-            vals[field_name] = get_enum_value(field_type, val)
-        elseif field_type <: Union{Nothing, Enum}
-            vals[field_name] = get_enum_value(field_type.b, val)
-        else
-            vals[field_name] = deserialize(field_type, val)
-        end
+    for (name, type) in zip(fieldnames(T), fieldtypes(T))
+        vals[name] = deserialize_type(name, type, data[string(name)], component_cache)
     end
 
     if !isempty(T.parameters)
@@ -88,6 +57,42 @@ function IS.deserialize_parametric_type(
     data::Dict,
 ) where {T <: Service}
     return T(; data...)
+end
+
+function deserialize_type(field_name, field_type, val, component_cache)
+    if isnothing(val)
+        value = val
+    elseif encode_as_uuid_type(field_type)
+        if field_type <: Vector{Service}
+            _vals = field_type()
+            for _val in val
+                uuid = deserialize(Base.UUID, _val)
+                component = component_cache[uuid]
+                push!(_vals, component)
+            end
+            value = _vals
+        else
+            uuid = deserialize(Base.UUID, val)
+            component = component_cache[uuid]
+            value = component
+        end
+    elseif field_type <: Component
+        value = IS.deserialize(field_type, val, component_cache)
+    elseif field_type <: Union{Nothing, Component}
+        value = IS.deserialize(field_type.b, val, component_cache)
+    elseif field_type <: InfrastructureSystemsType
+        value = deserialize(field_type, val)
+    elseif field_type <: Union{Nothing, InfrastructureSystemsType}
+        value = deserialize(field_type.b, val)
+    elseif field_type <: Enum
+        value = get_enum_value(field_type, val)
+    elseif field_type <: Union{Nothing, Enum}
+        value = get_enum_value(field_type.b, val)
+    else
+        value = deserialize(field_type, val)
+    end
+
+    return value
 end
 
 function get_component_type(component_type::String)
