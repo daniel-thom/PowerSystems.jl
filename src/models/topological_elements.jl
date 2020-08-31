@@ -14,6 +14,7 @@ function get_aggregation_topology_accessor(::Type{T}) where {T <: AggregationTop
     error("get_aggregation_topology_accessor must be implemented for $T")
 end
 
+# TODO: this should be handled in check_component_addition
 function CheckBusParams(
     number,
     name,

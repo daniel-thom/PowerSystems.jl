@@ -80,24 +80,8 @@ function DynamicInverter(
     P <: FrequencyEstimator,
     F <: Filter,
 }
-
-    n_states = (
-        converter.n_states +
-        outer_control.n_states +
-        inner_control.n_states +
-        dc_source.n_states +
-        freq_estimator.n_states +
-        filter.n_states
-    )
-
-    states = vcat(
-        converter.states,
-        outer_control.states,
-        inner_control.states,
-        dc_source.states,
-        freq_estimator.states,
-        filter.states,
-    )
+    n_states = _calc_n_states(converter, outer_control, inner_control, dc_source, freq_estimator, filter)
+    states = _calc_states(converter, outer_control, inner_control, dc_source, freq_estimator, filter)
 
     return DynamicInverter{C, O, IC, DC, P, F}(
         get_name(static_injector),
@@ -141,24 +125,8 @@ function DynamicInverter(;
     end
     if isnothing(n_states)
         @assert isnothing(states)
-        # TODO DT: make helper function
-        n_states = (
-            converter.n_states +
-            outer_control.n_states +
-            inner_control.n_states +
-            dc_source.n_states +
-            freq_estimator.n_states +
-            filter.n_states
-        )
-
-        states = vcat(
-            converter.states,
-            outer_control.states,
-            inner_control.states,
-            dc_source.states,
-            freq_estimator.states,
-            filter.states,
-        )
+        n_states = _calc_n_states(converter, outer_control, inner_control, dc_source, freq_estimator, filter)
+        states = _calc_states(converter, outer_control, inner_control, dc_source, freq_estimator, filter)
     else
         @assert !isnothing(states)
     end
@@ -194,3 +162,23 @@ get_filter(device::DynamicInverter) = device.filter
 get_internal(device::DynamicInverter) = device.internal
 get_P_ref(value::DynamicInverter) = get_P_ref(get_active_power(get_outer_control(value)))
 get_V_ref(value::DynamicInverter) = get_V_ref(get_reactive_power(get_outer_control(value)))
+
+function _calc_n_states(converter, outer_control, inner_control, dc_source, freq_estimator, filter)
+    return converter.n_states +
+            outer_control.n_states +
+            inner_control.n_states +
+            dc_source.n_states +
+            freq_estimator.n_states +
+            filter.n_states
+end
+
+function _calc_states(converter, outer_control, inner_control, dc_source, freq_estimator, filter)
+    return vcat(
+        converter.states,
+        outer_control.states,
+        inner_control.states,
+        dc_source.states,
+        freq_estimator.states,
+        filter.states,
+    )
+end

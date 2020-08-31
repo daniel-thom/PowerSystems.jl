@@ -197,6 +197,7 @@ export add_forecasts!
 export add_forecast!
 export remove_forecast!
 export clear_forecasts!
+export copy_forecasts!
 export add_component!
 export remove_component!
 export remove_components!

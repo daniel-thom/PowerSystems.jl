@@ -44,15 +44,17 @@ function DynamicBranch(::Nothing)
     DynamicBranch(Line(nothing))
 end
 
+const BRANCH_TYPE_KEY = "__branch_type"
+
 function IS.serialize(component::T) where {T <: DynamicBranch}
     data = Dict{String, Any}()
     for name in fieldnames(T)
         val = getfield(component, name)
         if name == :branch
             # The device is not attached to the system, so serialize it and save the type.
-            data["__branch_type"] = string(typeof(val))
+            data[BRANCH_TYPE_KEY] = string(typeof(val))
         end
-        data[string(name)] = serialize(val)
+        data[string(name)] = serialize_uuid_handling(val)
     end
 
     return data
@@ -68,10 +70,10 @@ function IS.deserialize(
     for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
         val = data[string(field_name)]
         if field_name == :branch
-            type = get_component_type(data["__branch_type"])
+            type = get_component_type(data[BRANCH_TYPE_KEY])
             vals[field_name] = deserialize(type, val, component_cache)
         else
-            vals[field_name] = deserialize_type(field_name, field_type, val, component_cache)
+            vals[field_name] = deserialize_uuid_handling(field_type, field_name, val, component_cache)
         end
     end
 

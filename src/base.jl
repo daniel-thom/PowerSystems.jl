@@ -279,7 +279,8 @@ foreach(x -> add_component!(sys, x), Iterators.flatten((buses, generators)))
 function add_component!(sys::System, component::T; kwargs...) where {T <: Component}
     set_unit_system!(component, sys.units_settings)
     @assert has_units_setting(component)
-    if !_is_deserialization_in_progress(sys)
+    deserialization_in_progress = _is_deserialization_in_progress(sys)
+    if !deserialization_in_progress
         check_component_addition(sys, component)
         check_attached_buses(sys, component)
         check_for_services_on_addition(sys, component)
@@ -289,9 +290,9 @@ function add_component!(sys::System, component::T; kwargs...) where {T <: Compon
         throw(IS.InvalidValue("Invalid value for $(component)"))
     end
 
-    IS.add_component!(sys.data, component; kwargs...)
+    IS.add_component!(sys.data, component; deserialization_in_progress = deserialization_in_progress, kwargs...)
 
-    if !_is_deserialization_in_progress(sys)
+    if !deserialization_in_progress
         # Whatever this may change should have been validated above in
         # check_component_addition, so this should not fail.
         handle_component_addition!(sys, component)
@@ -875,6 +876,7 @@ function are_forecasts_contiguous(component::Component)
 end
 
 """
+Generates all possible initial times for the stored forecasts. This should return the same
 result regardless of whether the forecasts have been stored as one contiguous array or
 chunks of contiguous arrays, such as one 365-day forecast vs 365 one-day forecasts.
 
@@ -1223,11 +1225,9 @@ function deserialize_components!(sys::System, raw)
         include_types = [Arc, Service],
         skip_types = [StaticReserveGroup],
     )
-    # Devices and StaticReserveGroup have services, skip one round.
-    deserialize_and_add!(; include_types = [DynamicInjection, StaticReserveGroup])
-    # StaticInjection has to follow DynamicInjection.
-    deserialize_and_add!(; include_types = [Device])
-    deserialize_and_add!(; include_types = [RegulationDevice, DynamicBranch])
+    # Static injection devices can contain dynamic injection devices.
+    deserialize_and_add!(; include_types = [StaticReserveGroup, DynamicInjection])
+    deserialize_and_add!(;)
 end
 
 """

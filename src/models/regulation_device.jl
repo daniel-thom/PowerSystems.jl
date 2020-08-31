@@ -93,23 +93,17 @@ function RegulationDevice(;
     )
 end
 
+const STATIC_INJECTOR_TYPE_KEY = "__static_injector_type"
+
 function IS.serialize(component::T) where {T <: RegulationDevice}
     data = Dict{String, Any}()
     for name in fieldnames(T)
         val = getfield(component, name)
         if val isa StaticInjection
             # The device is not attached to the system, so serialize it and save the type.
-            data["__static_injector_type"] = string(typeof(val))
-        elseif encode_as_uuid_val(val)
-            if val isa Array
-                val = [IS.get_uuid(x) for x in val]
-            elseif isnothing(val)
-                val = nothing
-            else
-                val = IS.get_uuid(val)
-            end
+            data[STATIC_INJECTOR_TYPE_KEY] = string(typeof(val))
         end
-        data[string(name)] = serialize(val)
+        data[string(name)] = serialize_uuid_handling(val)
     end
 
     return data
@@ -122,36 +116,15 @@ function IS.deserialize(
 ) where {T <: RegulationDevice}
     @debug T data
     vals = Dict{Symbol, Any}()
-    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
-        val = data[string(field_name)]
+    for (name, type) in zip(fieldnames(T), fieldtypes(T))
+        val = data[string(name)]
         if isnothing(val)
-            vals[field_name] = val
-        elseif field_type <: StaticInjection
-            type = get_component_type(data["__static_injector_type"])
-            vals[field_name] = deserialize(type, val, component_cache)
-        elseif encode_as_uuid_type(field_type)
-            if field_type <: Vector{Service}
-                _vals = field_type()
-                for _val in val
-                    uuid = deserialize(Base.UUID, _val)
-                    component = component_cache[uuid]
-                    push!(_vals, component)
-                end
-                vals[field_name] = _vals
-            else
-                uuid = deserialize(Base.UUID, val)
-                component = component_cache[uuid]
-                vals[field_name] = component
-            end
-        elseif field_type <: Component
-            # Recurse.
-            vals[field_name] = IS.deserialize(field_type, val, component_cache)
-        elseif field_type <: Enum
-            vals[field_name] = get_enum_value(field_type, val)
-        elseif field_type <: Union{Nothing, Enum}
-            vals[field_name] = get_enum_value(field_type.b, val)
+            vals[name] = val
+        elseif type <: StaticInjection
+            type = get_component_type(data[STATIC_INJECTOR_TYPE_KEY])
+            vals[name] = deserialize(type, val, component_cache)
         else
-            vals[field_name] = IS.deserialize(field_type, val)
+            vals[name] = deserialize_uuid_handling(type, name, val, component_cache)
         end
     end
 

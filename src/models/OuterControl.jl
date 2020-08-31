@@ -66,7 +66,6 @@ function IS.deserialize(::Type{T}, data::Dict) where {T <: OuterControl}
         elseif field_name == :reactive_power
             vals[field_name] = deserialize(T.parameters[2], val)
         elseif field_name == :states
-            # TODO DT: can this be redefined as Vector{String}
             vals[field_name] = [Symbol(x) for x in val]
         else
             vals[field_name] = deserialize(field_type, val)

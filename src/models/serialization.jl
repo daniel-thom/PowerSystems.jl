@@ -1,4 +1,3 @@
-# Keep in sync with _ENCODE_AS_UUID_A.
 const _ENCODE_AS_UUID_A = (
     Union{Nothing, Arc},
     Union{Nothing, Area},
@@ -8,36 +7,45 @@ const _ENCODE_AS_UUID_A = (
     Vector{Service},
 )
 
-# Keep in sync with _ENCODE_AS_UUID_B.
 const _ENCODE_AS_UUID_B = (Arc, Area, Bus, LoadZone, DynamicInjection, Vector{Service})
+@assert length(_ENCODE_AS_UUID_A) == length(_ENCODE_AS_UUID_B)
 
-encode_as_uuid_type(::Type{T}) where {T} = mapreduce(x -> T <: x, |, _ENCODE_AS_UUID_A)
-encode_as_uuid_val(val) = mapreduce(x -> val isa x, |, _ENCODE_AS_UUID_B)
+should_encode_as_uuid(val) = mapreduce(x -> val isa x, |, _ENCODE_AS_UUID_B)
+should_encode_as_uuid(::Type{T}) where {T} = mapreduce(x -> T <: x, |, _ENCODE_AS_UUID_A)
 
 function IS.serialize(component::T) where {T <: Component}
     data = Dict{String, Any}()
     for name in fieldnames(T)
-        val = getfield(component, name)
-        if encode_as_uuid_val(val)
-            if val isa Array
-                val = [IS.get_uuid(x) for x in val]
-            elseif isnothing(val)
-                val = nothing
-            else
-                val = IS.get_uuid(val)
-            end
-        end
-        data[string(name)] = serialize(val)
+        data[string(name)] = serialize_uuid_handling(getfield(component, name))
     end
 
     return data
+end
+
+"""
+Serialize the value, encoding as UUIDs where necessary.
+"""
+function serialize_uuid_handling(val)
+    if should_encode_as_uuid(val)
+        if val isa Array
+            value = [IS.get_uuid(x) for x in val]
+        elseif isnothing(val)
+            value = nothing
+        else
+            value = IS.get_uuid(val)
+        end
+    else
+        value = val
+    end
+
+    return serialize(value)
 end
 
 function IS.deserialize(::Type{T}, data::Dict, component_cache::Dict) where {T <: Component}
     @debug T data
     vals = Dict{Symbol, Any}()
     for (name, type) in zip(fieldnames(T), fieldtypes(T))
-        vals[name] = deserialize_type(name, type, data[string(name)], component_cache)
+        vals[name] = deserialize_uuid_handling(type, name, data[string(name)], component_cache)
     end
 
     if !isempty(T.parameters)
@@ -56,14 +64,19 @@ function IS.deserialize_parametric_type(
     mod::Module,
     data::Dict,
 ) where {T <: Service}
+    # This exists because Services need to be constructed with the parametric type included.
+    # VariableReserve{ReserveUp}(...)
     return T(; data...)
 end
 
-function deserialize_type(field_name, field_type, val, component_cache)
+"""
+Deserialize the value, converting UUIDs to components where necessary.
+"""
+function deserialize_uuid_handling(field_type, field_name, val, component_cache)
     if isnothing(val)
         value = val
-    elseif encode_as_uuid_type(field_type)
-        if field_type <: Vector{Service}
+    elseif should_encode_as_uuid(field_type)
+        if field_type <: Vector
             _vals = field_type()
             for _val in val
                 uuid = deserialize(Base.UUID, _val)

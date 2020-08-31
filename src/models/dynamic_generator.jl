@@ -65,20 +65,8 @@ function DynamicGenerator(
     pss::P,
     ext::Dict{String, Any} = Dict{String, Any}(),
 ) where {M <: Machine, S <: Shaft, A <: AVR, TG <: TurbineGov, P <: PSS}
-    n_states = (
-        get_n_states(machine) +
-        get_n_states(shaft) +
-        get_n_states(avr) +
-        get_n_states(prime_mover) +
-        get_n_states(pss)
-    )
-    states = vcat(
-        get_states(machine),
-        get_states(shaft),
-        get_states(avr),
-        get_states(prime_mover),
-        get_states(pss),
-    )
+    n_states = _calc_n_states(machine, shaft, avr, prime_mover, pss)
+    states = _calc_states(machine, shaft, avr, prime_mover, pss)
 
     return DynamicGenerator{M, S, A, TG, P}(
         get_name(static_injector),
@@ -113,21 +101,8 @@ function DynamicGenerator(;
     end
     if isnothing(n_states)
         @assert isnothing(states)
-        # TODO DT: make helper function
-        n_states = (
-            get_n_states(machine) +
-            get_n_states(shaft) +
-            get_n_states(avr) +
-            get_n_states(prime_mover) +
-            get_n_states(pss)
-        )
-        states = vcat(
-            get_states(machine),
-            get_states(shaft),
-            get_states(avr),
-            get_states(prime_mover),
-            get_states(pss),
-        )
+        n_states = _calc_n_states(machine, shaft, avr, prime_mover, pss)
+        states = _calc_states(machine, shaft, avr, prime_mover, pss)
     else
         @assert !isnothing(states)
     end
@@ -160,3 +135,21 @@ get_ext(device::DynamicGenerator) = device.ext
 get_internal(device::DynamicGenerator) = device.internal
 get_V_ref(value::DynamicGenerator) = get_V_ref(get_avr(value))
 get_P_ref(value::DynamicGenerator) = get_P_ref(get_prime_mover(value))
+
+function _calc_n_states(machine, shaft, avr, prime_mover, pss)
+    return get_n_states(machine) +
+            get_n_states(shaft) +
+            get_n_states(avr) +
+            get_n_states(prime_mover) +
+            get_n_states(pss)
+end
+
+function _calc_states(machine, shaft, avr, prime_mover, pss)
+    return vcat(
+        get_states(machine),
+        get_states(shaft),
+        get_states(avr),
+        get_states(prime_mover),
+        get_states(pss),
+    )
+end
