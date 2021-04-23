@@ -790,6 +790,13 @@ function get_available_components(::Type{T}, sys::System) where {T <: Component}
 end
 
 """
+Gets components that are hidden.
+"""
+function get_hidden_components(::Type{T}, sys::System) where {T <: Component}
+    return IS.get_hidden_components(T, sys.data)
+end
+
+"""
 Return true if the component is attached to the system.
 """
 function is_attached(component::T, sys::System) where {T <: Component}

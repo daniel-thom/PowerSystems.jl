@@ -237,6 +237,11 @@ export get_component
 export get_components
 export get_components_by_name
 export get_available_components
+export get_hidden_components
+export set_composed!
+export is_composed
+export set_hidden!
+export is_hidden
 export get_forecast_horizon
 export get_forecast_initial_timestamp
 export get_forecast_interval
@@ -376,6 +381,10 @@ import InfrastructureSystems:
     get_window,
     get_name,
     set_name!,
+    set_composed!,
+    set_hidden!,
+    is_composed,
+    is_hidden,
     iterate_windows,
     get_time_series,
     get_time_series_array,
