@@ -319,11 +319,14 @@ export remove_supplemental_attribute!
 export remove_supplemental_attributes!
 export get_supplemental_attribute
 export get_supplemental_attributes
+export list_supplemental_attributes
 export has_supplemental_attributes
 export iterate_supplemental_attributes
 export get_time_series
 export get_time_series_array
 export list_time_series_resolutions
+export supports_time_series
+export supports_supplemental_attributes
 export get_time_series_timestamps
 export get_time_series_values
 export get_time_series_counts
@@ -358,7 +361,6 @@ export get_bus_numbers
 export get_name
 export set_name!
 export get_component_uuids
-export get_supplemental_attributes_container
 export get_description
 export set_description!
 export get_base_power
@@ -501,11 +503,10 @@ import InfrastructureSystems:
     get_component_uuids,
     get_supplemental_attribute,
     get_supplemental_attributes,
-    get_supplemental_attributes_container,
+    list_supplemental_attributes,
     set_name!,
     get_internal,
     set_internal!,
-    get_time_series_container,
     iterate_windows,
     get_time_series,
     has_time_series,
@@ -557,7 +558,9 @@ import InfrastructureSystems:
     get_x_coords,
     get_y0,  # TODO reevaluate whether this should be exported
     get_raw_data,
-    get_raw_data_type
+    get_raw_data_type,
+    supports_time_series,
+    supports_supplemental_attributes
 
 const IS = InfrastructureSystems
 
@@ -583,6 +586,9 @@ abstract type Component <: IS.InfrastructureSystemsComponent end
 
 """ Supertype for "devices" (bus, line, etc.) """
 abstract type Device <: Component end
+
+supports_time_series(::Device) = true
+supports_supplemental_attributes(::Device) = true
 
 # Include utilities
 include("utils/logging.jl")
